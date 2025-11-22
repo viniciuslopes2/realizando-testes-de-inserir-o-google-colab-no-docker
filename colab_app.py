@@ -54,6 +54,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import re
+import unicodedata  # <--- ADICIONADO O IMPORT QUE FALTAVA AQUI
 
 st.set_page_config(page_title="Dashboard de Dados - SJC", page_icon="📊", layout="wide")
 
