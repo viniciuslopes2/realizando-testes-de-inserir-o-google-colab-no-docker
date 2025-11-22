@@ -450,15 +450,36 @@ def gerar_dashboard_zona(zona, dfs):
     
     # Helper para filtrar DF pela coluna 'regiao'
     def filtrar_zona(df):
-        if df.empty or 'regiao' not in df.columns: return pd.DataFrame()
-        # Cria coluna temporaria normalizada para comparação
-        df['regiao_norm'] = df['regiao'].apply(normalizar_texto)
-        # Tenta match exato ou contains
-        df_filt = df[df['regiao_norm'] == zona_norm]
-        if df_filt.empty:
-             # Tenta match parcial (ex: 'zona centro' vs 'centro')
-             df_filt = df[df['regiao_norm'].str.contains(zona_norm, na=False)]
-        return df_filt.drop(columns=['regiao_norm'])
+        if df.empty: return pd.DataFrame()
+        
+        # Normaliza colunas para garantir que encontramos 'regiao' mesmo se houver variações
+        # (O carregamento já faz isso, mas seguro morreu de velho)
+        col_regiao = next((c for c in df.columns if 'regiao' in c.lower()), None)
+        if not col_regiao: return pd.DataFrame()
+
+        df['temp_search'] = df[col_regiao].astype(str).apply(normalizar_texto)
+        
+        # Lista de termos para tentar casar
+        termos = [zona_norm] # Ex: 'zona central'
+        
+        # Variações comuns
+        parts = zona_norm.split()
+        if 'zona' in parts: parts.remove('zona')
+        core_name = " ".join(parts) # Ex: 'central', 'norte'
+        
+        termos.append(core_name)
+        
+        # Sinônimos específicos SJC
+        if 'central' in core_name: termos.append('centro')
+        if 'centro' in core_name: termos.append('central')
+        
+        # Filtragem: Verifica se ALGUM termo está contido na coluna
+        # Usamos regex com pipe | para OR (ex: "zona central|central|centro")
+        pattern = '|'.join([re.escape(t) for t in termos if t])
+        
+        df_filt = df[df['temp_search'].str.contains(pattern, regex=True, na=False)]
+        
+        return df_filt.drop(columns=['temp_search'])
 
     # 1. Serviços Públicos
     st.header("1. Serviços Públicos")
