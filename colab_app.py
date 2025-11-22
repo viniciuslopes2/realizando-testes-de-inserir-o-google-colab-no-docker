@@ -1,11 +1,9 @@
 # ==============================================================================
-# PASSO 1: Instalando bibliotecas para assegurar que o programa rode.
+# PASSO 1: Título e Imports de Sistema
 # ==============================================================================
-# ATUALIZADO: Título da instalação
 print("--- [1/7] Bibliotecas serão instaladas via Docker (requirements.txt) ---")
 import os
-# REMOVIDO: A linha os.system('pip install ...') foi removida.
-# O Docker cuidará disso.
+# O Docker cuidará das instalações via requirements.txt
 print("Sucesso!")
 
 
@@ -16,12 +14,12 @@ import subprocess
 import time
 import atexit
 import socket
-from flask import Flask, render_template, url_for
-# REMOVIDO: import do pyngrok
+from flask import Flask, render_template, request, url_for # Adicionado request
 import pandas as pd
 import re
+import urllib.parse # Adicionado para codificar nomes das zonas na URL
 
-# Imports para o Mapa (serão usados no PASSO 5.5)
+# Imports para o Mapa
 import folium
 import json
 import geopandas as gpd
@@ -41,8 +39,6 @@ print("Pastas 'templates' e 'static/css' prontas.")
 # ==============================================================================
 print("\n--- [3/7] Definindo URLs dos arquivos de dados (via jsDelivr CDN)... ---")
 
-# URLs originais convertidas para usar o CDN jsDelivr para evitar rate limiting (Erro 429)
-# ATUALIZADO: Todos os links de CSV trocados para o formato CDN @main com os caminhos corretos
 urls_csv = {
     "idade_sexo_2022": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/RubyFox%20-%20Dados%20de%202022%20-%20Idade%20e%20sexo.csv",
     "populacao_residencia_2022": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/RubyFox%20-%20Dados%20de%202022%20-%20popula%C3%A7%C3%A3o%20e%20residencia.csv",
@@ -66,16 +62,16 @@ urls_csv = {
     "projecao_envelhecimento_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/projecao_envelhecimento_sjc.csv",
     "envelhecimento_por_zonas": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/envelhecimento_por_zonas.csv"
 }
-print("URLs definidas.")
+
+dataframes = {name: carregar_dados_csv(url) for name, url in urls_csv.items()}
+print("URLs definidas e dados carregados na memória principal.")
 
 
 # ==============================================================================
-# PASSO 4: Criando o arquivo do dashboard Streamlit (com lógica para gráficos individuais)
+# PASSO 4: Criando o arquivo do dashboard Streamlit
 # ==============================================================================
 print("\n--- [4/7] Criando o arquivo do dashboard Streamlit (app_dashboard.py)... ---")
 
-# O código do Streamlit é uma string longa, então vamos definir as URLs aqui
-# e substituí-las dentro da string
 streamlit_code = r"""
 import streamlit as st
 import pandas as pd
@@ -90,7 +86,6 @@ def carregar_dados_csv(url):
     try:
         df = pd.read_csv(url)
         original_columns = df.columns.tolist()
-
         rename_map = {}
         for col in original_columns:
             new_col = col.strip().lower()
@@ -99,19 +94,15 @@ def carregar_dados_csv(url):
                 new_col = new_col.replace(old, new)
             new_col = re.sub(r'[^a-z0-9_]', '', new_col)
             rename_map[col] = new_col
-
         df = df.rename(columns=rename_map)
-
         if 'populacao_residencia_2022' in url and 'densidade' in df.columns:
             df['densidade'] = df['densidade'].astype(str).str.replace(',', '.', regex=False).astype(float)
-
         return df
     except Exception as e:
         st.error(f"Erro ao carregar dados de {url}: {e}")
         return pd.DataFrame()
 
-# URLs do jsDelivr (substituídas)
-# ATUALIZADO: Todos os links de CSV trocados para o formato CDN @main com os caminhos corretos
+# URLs do jsDelivr
 urls_csv = {
     "idade_sexo_2022": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/RubyFox%20-%20Dados%20de%202022%20-%20Idade%20e%20sexo.csv",
     "populacao_residencia_2022": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/RubyFox%20-%20Dados%20de%202022%20-%20popula%C3%A7%C3%A3o%20e%20residencia.csv",
@@ -138,6 +129,7 @@ urls_csv = {
 
 dataframes = {name: carregar_dados_csv(url) for name, url in urls_csv.items()}
 
+# --- FUNÇÕES AUXILIARES ---
 def normalizar_faixa_etaria_2010(indicador):
     indicador = str(indicador).lower()
     if 'menos de 1' in indicador or '1 a 4' in indicador: return '0 a 4 anos'
@@ -166,6 +158,18 @@ def normalizar_faixa_etaria_2010(indicador):
 def formatar_faixa_display(faixa):
     return faixa.replace('_', ' ').replace(' a ', '-').replace(' anos', '').replace(' ou mais', '+')
 
+def normalizar_texto(s):
+    if not isinstance(s, str): return str(s)
+    s = s.lower()
+    s = re.sub(r'[áàâãä]', 'a', s)
+    s = re.sub(r'[éèêë]', 'e', s)
+    s = re.sub(r'[íìîï]', 'i', s)
+    s = re.sub(r'[óòôõö]', 'o', s)
+    s = re.sub(r'[úùûü]', 'u', s)
+    s = re.sub(r'[ç]', 'c', s)
+    return s.strip()
+
+# --- FUNÇÕES DE GRÁFICOS GERAIS ---
 def gerar_grafico_sexo(df_idade_sexo_2022, df_faixa_h_2010, df_faixa_m_2010, df_pop_2022, df_pop_res_2010):
     st.header("Análise Populacional")
     if not df_pop_2022.empty and not df_pop_res_2010.empty:
@@ -461,29 +465,108 @@ def gerar_grafico_envelhecimento(df_projecao, df_zonas, df_unidades, df_servicos
     if not df_servicos.empty:
         st.dataframe(df_servicos.rename(columns={'tipo_servico':'Tipo de Serviço', 'quantidade':'Quantidade', 'regiao_localizacao': 'Região/Localização', 'capacidade_atendimento': 'Capacidade', 'cobertura_estimada_idosos': 'Cobertura Estimada'}), use_container_width=True, hide_index=True)
 
+# --- NOVA FUNÇÃO: DASHBOARD ESPECÍFICO POR ZONA ---
+def gerar_dashboard_zona(zona, dfs):
+    st.title(f"Perfil Detalhado: {zona}")
+    
+    # Normalizar o nome da zona para filtrar os dataframes (remover acentos, lowercase)
+    zona_norm = normalizar_texto(zona)
+    
+    # Helper para filtrar DF pela coluna 'regiao'
+    def filtrar_zona(df):
+        if df.empty or 'regiao' not in df.columns: return pd.DataFrame()
+        # Cria coluna temporaria normalizada para comparação
+        df['regiao_norm'] = df['regiao'].apply(normalizar_texto)
+        # Tenta match exato ou contains
+        df_filt = df[df['regiao_norm'] == zona_norm]
+        if df_filt.empty:
+             # Tenta match parcial (ex: 'zona centro' vs 'centro')
+             df_filt = df[df['regiao_norm'].str.contains(zona_norm, na=False)]
+        return df_filt.drop(columns=['regiao_norm'])
 
+    # 1. Serviços Públicos
+    st.header("1. Serviços Públicos")
+    df_serv = filtrar_zona(dfs['servicos_publicos_zonas'])
+    if not df_serv.empty:
+        cols = st.columns(3)
+        cols[0].metric("UBS", df_serv['ubs_unidades_basicas_saude'].values[0] if 'ubs_unidades_basicas_saude' in df_serv else '-')
+        cols[1].metric("Hospitais", df_serv['hospitais'].values[0] if 'hospitais' in df_serv else '-')
+        cols[2].metric("Escolas Municipais", df_serv['escolas_municipais'].values[0] if 'escolas_municipais' in df_serv else '-')
+        st.dataframe(df_serv, hide_index=True)
+    else:
+        st.info(f"Dados de serviços não encontrados para {zona}")
+
+    # 2. Trânsito
+    st.header("2. Trânsito e Mobilidade")
+    df_trans = filtrar_zona(dfs['transito_zonas_sjc'])
+    if not df_trans.empty:
+        st.write(f"**Nível de Congestionamento:** {df_trans['nivel_congestionamento'].values[0]}")
+        st.write(f"**Características:** {df_trans['caracteristicas_transito'].values[0]}")
+    else:
+        st.info("Dados de trânsito não encontrados.")
+
+    # 3. População
+    st.header("3. Crescimento Populacional")
+    df_pop = filtrar_zona(dfs['pop_cresc_zonas_sjc'])
+    if not df_pop.empty:
+        st.metric("Crescimento Percentual (2010-2022)", f"{df_pop['crescimento_percentual'].values[0]}%")
+    
+    # 4. Educação
+    st.header("4. Educação")
+    col_edu1, col_edu2 = st.columns(2)
+    
+    with col_edu1:
+        st.subheader("Creches")
+        df_creche = filtrar_zona(dfs['creches_zonas_sjc'])
+        if not df_creche.empty:
+            st.write(f"**Demanda Atual:** {df_creche['demanda_atual'].values[0]}")
+            st.write(f"**Necessidade:** {df_creche['necessidade_expansao'].values[0]}")
+    
+    with col_edu2:
+        st.subheader("IDEB")
+        df_ideb = filtrar_zona(dfs['ideb_qualidade_zonas_sjc'])
+        if not df_ideb.empty:
+            st.metric("IDEB Anos Iniciais", df_ideb['ideb_anos_iniciais_estimado'].values[0])
+            st.metric("IDEB Anos Finais", df_ideb['ideb_anos_finais_estimado'].values[0])
+
+    # 5. Saúde do Idoso
+    st.header("5. Saúde do Idoso")
+    df_idoso = filtrar_zona(dfs['unidades_saude_idosos_zonas'])
+    if not df_idoso.empty:
+        st.metric("UBS com foco em Idosos", df_idoso['ubs_existentes'].values[0])
+
+
+# --- LÓGICA PRINCIPAL: SWITCH ENTRE GRÁFICOS GERAIS E ZONA ---
 params = st.query_params
-graph_id = int(params.get("grafico_id", [1])[0])
+zona_param = params.get("zona", None) # Verifica se veio da URL do mapa
 
-if graph_id == 1:
-    gerar_grafico_sexo(dataframes["idade_sexo_2022"], dataframes["faixa_etaria_homens_2010"], dataframes["faixa_etaria_mulheres_2010"], dataframes["populacao_residencia_2022"], dataframes["populacao_residente_sjc_2010"])
-elif graph_id == 2:
-    gerar_grafico_densidade(dataframes["densidade_demografica_sjc_2010"], dataframes["populacao_residencia_2022"])
-elif graph_id == 3:
-    gerar_piramide_etaria(dataframes["idade_sexo_2022"], dataframes["faixa_etaria_homens_2010"], dataframes["faixa_etaria_mulheres_2010"], dataframes["populacao_residencia_2022"], dataframes["populacao_residente_sjc_2010"])
-elif graph_id == 4:
-    gerar_grafico_populacao_residente(dataframes["populacao_residencia_2022"], dataframes["populacao_residente_sjc_2010"], dataframes["pop_cresc_zonas_sjc"])
-elif graph_id == 5:
-    gerar_grafico_transito_frota(dataframes["frota_veiculos_sjc"], dataframes["transito_zonas_sjc"])
-elif graph_id == 6:
-    gerar_grafico_servicos(dataframes["servicos_publicos_zonas"])
-elif graph_id == 7:
-    gerar_grafico_alfabetizacao(dataframes["alfabetizacao_geral_sjc"], dataframes["alfabetizacao_por_zonas_sjc"], dataframes["ideb_qualidade_zonas_sjc"], dataframes["matriculas_por_periodo_zonas"], dataframes["escolaridade_por_nivel_sjc"], dataframes["creches_zonas_sjc"])
-elif graph_id == 8:
-    gerar_grafico_envelhecimento(dataframes["projecao_envelhecimento_sjc"], dataframes["envelhecimento_por_zonas"], dataframes["unidades_saude_idosos_zonas"], dataframes["servicos_geriatricos_sjc"])
+if zona_param:
+    # Se tem zona na URL, mostra o dashboard específico
+    # zona_param pode vir como lista ou string dependendo da versão do streamlit, garante string
+    if isinstance(zona_param, list): zona_param = zona_param[0]
+    gerar_dashboard_zona(zona_param, dataframes)
 else:
-    st.error("Gráfico não encontrado.")
-
+    # Se não tem zona, usa a lógica antiga de IDs
+    graph_id = int(params.get("grafico_id", [1])[0])
+    
+    if graph_id == 1:
+        gerar_grafico_sexo(dataframes["idade_sexo_2022"], dataframes["faixa_etaria_homens_2010"], dataframes["faixa_etaria_mulheres_2010"], dataframes["populacao_residencia_2022"], dataframes["populacao_residente_sjc_2010"])
+    elif graph_id == 2:
+        gerar_grafico_densidade(dataframes["densidade_demografica_sjc_2010"], dataframes["populacao_residencia_2022"])
+    elif graph_id == 3:
+        gerar_piramide_etaria(dataframes["idade_sexo_2022"], dataframes["faixa_etaria_homens_2010"], dataframes["faixa_etaria_mulheres_2010"], dataframes["populacao_residencia_2022"], dataframes["populacao_residente_sjc_2010"])
+    elif graph_id == 4:
+        gerar_grafico_populacao_residente(dataframes["populacao_residencia_2022"], dataframes["populacao_residente_sjc_2010"], dataframes["pop_cresc_zonas_sjc"])
+    elif graph_id == 5:
+        gerar_grafico_transito_frota(dataframes["frota_veiculos_sjc"], dataframes["transito_zonas_sjc"])
+    elif graph_id == 6:
+        gerar_grafico_servicos(dataframes["servicos_publicos_zonas"])
+    elif graph_id == 7:
+        gerar_grafico_alfabetizacao(dataframes["alfabetizacao_geral_sjc"], dataframes["alfabetizacao_por_zonas_sjc"], dataframes["ideb_qualidade_zonas_sjc"], dataframes["matriculas_por_periodo_zonas"], dataframes["escolaridade_por_nivel_sjc"], dataframes["creches_zonas_sjc"])
+    elif graph_id == 8:
+        gerar_grafico_envelhecimento(dataframes["projecao_envelhecimento_sjc"], dataframes["envelhecimento_por_zonas"], dataframes["unidades_saude_idosos_zonas"], dataframes["servicos_geriatricos_sjc"])
+    else:
+        st.error("Gráfico não encontrado.")
 """
 STREAMLIT_APP_FILE = "app_dashboard.py"
 with open(STREAMLIT_APP_FILE, "w", encoding="utf-8") as f:
@@ -497,7 +580,6 @@ print(f"Arquivo '{STREAMLIT_APP_FILE}' criado com sucesso.")
 print("\n--- [5/7] Criando os arquivos HTML e CSS para o portal Flask... ---")
 
 # URLs das imagens convertidas para jsDelivr
-# ATUALIZADO: Todos os links de imagens trocados para o formato CDN @main com os caminhos corretos
 graficos_info = {
     1: {"titulo": "População por Sexo", "imagem": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/.misc/img_template/img_html/img_sex.jpg"},
     2: {"titulo": "Densidade Demográfica", "imagem": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/.misc/img_template/img_html/img_dens_demo.jpg"},
@@ -510,7 +592,6 @@ graficos_info = {
 }
 
 # URLs do layout convertidas para jsDelivr
-# ATUALIZADO: Links do Ícone e Brasão
 layout_html = """
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -584,7 +665,6 @@ layout_html = """
 with open("templates/layout.html", "w", encoding="utf-8") as f:
     f.write(layout_html)
 
-# ATUALIZADO: Seção do mapa agora tem um ID e um <iframe> para o mapa
 index_html = """
 {% extends "layout.html" %}
 {% block content %}
@@ -644,6 +724,11 @@ grafico_html = """
             const iframe = document.getElementById('streamlit-iframe');
             const loader = document.getElementById('loader-container');
             const streamlitUrl = "{{ streamlit_public_url }}";
+            
+            // Pega a Zona da URL se existir (injetada pelo Flask)
+            const zonaParam = "{{ zona|default('', true) }}";
+            const graficoId = "{{ grafico_id|default('', true) }}";
+            
             iframe.onload = function() {
                 loader.style.display = 'none';
                 iframe.style.visibility = 'visible';
@@ -651,7 +736,16 @@ grafico_html = """
             iframe.onerror = function() {
                 loader.innerHTML = '<p class="loader-text" style="color: red;">Erro ao carregar o dashboard.</p>';
             }
-            iframe.src = streamlitUrl + "?grafico_id={{ grafico_id }}";
+            
+            // Monta a URL correta pro Streamlit
+            let finalSrc = streamlitUrl;
+            if (zonaParam) {
+                finalSrc += "?zona=" + encodeURIComponent(zonaParam);
+            } else if (graficoId) {
+                finalSrc += "?grafico_id=" + graficoId;
+            }
+            
+            iframe.src = finalSrc;
         });
     </script>
 {% endblock %}
@@ -660,7 +754,6 @@ with open("templates/grafico.html", "w", encoding="utf-8") as f:
     f.write(grafico_html)
 
 # URL do banner convertida para jsDelivr
-# ATUALIZADO: Link do Banner
 css_content = """
 * { padding: 0; margin: 0; border: none; box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -822,13 +915,21 @@ try:
         area_str = f"{area_calc:.2f}"
         dens_str = f"{densidade:.2f} hab/km²" if densidade else "---"
 
+        # Link para página de detalhes da zona
+        # Usamos urllib.parse.quote para garantir que espaços e acentos na URL funcionem
+        safe_nome_url = urllib.parse.quote(nome_raw)
+        
         popup_html = f"""
         <div style="font-family: Arial, sans-serif; font-size:13px;">
           <b>{nome_raw if nome_raw else 'Sem nome'}</b><br>
           População: {pop_str}<br>
           Área: {area_str} km²<br>
           Densidade: {dens_str}<br>
-          <a href="#" onclick="togglePoly_{safe}();return false;">Mostrar/Esconder área</a>
+          <a href="#" onclick="togglePoly_{safe}();return false;" style="color: #0654A5;">Mostrar/Esconder área</a><br>
+          <br>
+          <a href="/zona_detalhes?zona={safe_nome_url}" target="_top" style="font-weight: bold; color: #EC6608;">
+             Ver gráficos desta zona &rarr;
+          </a>
         </div>
         """
 
@@ -927,6 +1028,22 @@ def pagina_grafico(grafico_id):
 def pagina_mapa():
     """Serve a página do mapa interativo."""
     return render_template('mapa.html')
+
+# NOVA ROTA: Página de detalhes da zona selecionada no mapa
+@app.route("/zona_detalhes")
+def pagina_zona_detalhes():
+    global streamlit_public_url
+    # Pega o nome da zona da URL (ex: ?zona=Zona%20Centro)
+    zona = request.args.get('zona')
+    if not zona:
+        return "Zona não especificada", 400
+    
+    # Reutiliza o template grafico.html, mas passando o parametro 'zona'
+    return render_template('grafico.html', 
+                           title=f"Dados da {zona}", 
+                           streamlit_public_url=streamlit_public_url, 
+                           grafico_id=None, # Não estamos usando ID aqui
+                           zona=zona) # Passamos a zona para o template
 
 # ATUALIZADO: Bloco try/except removido do ngrok e app.run modificado para deploy
 try:
