@@ -14,10 +14,10 @@ import subprocess
 import time
 import atexit
 import socket
-from flask import Flask, render_template, request, url_for # Adicionado request
+from flask import Flask, render_template, request, url_for
 import pandas as pd
 import re
-import urllib.parse # Adicionado para codificar nomes das zonas na URL
+import urllib.parse
 
 # Imports para o Mapa
 import folium
@@ -35,36 +35,12 @@ print("Pastas 'templates' e 'static/css' prontas.")
 
 
 # ==============================================================================
-# PASSO 3: Carregando os dados diretamente dos CSVs via GitHub (com jsDelivr).
+# PASSO 3: (ETAPA REMOVIDA - Dados são carregados apenas no Streamlit)
 # ==============================================================================
-print("\n--- [3/7] Definindo URLs dos arquivos de dados (via jsDelivr CDN)... ---")
-
-urls_csv = {
-    "idade_sexo_2022": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/RubyFox%20-%20Dados%20de%202022%20-%20Idade%20e%20sexo.csv",
-    "populacao_residencia_2022": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/RubyFox%20-%20Dados%20de%202022%20-%20popula%C3%A7%C3%A3o%20e%20residencia.csv",
-    "densidade_demografica_sjc_2010": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/densidade_demografica_sjc_2010.csv",
-    "faixa_etaria_homens_2010": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/faixa_etaria_homens_2010.csv",
-    "faixa_etaria_mulheres_2010": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/faixa_etaria_mulheres_2010.csv",
-    "populacao_residente_sjc_2010": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/populacao_residente_sjc_2010.csv",
-    "servicos_publicos_zonas": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/servicos_publicos_zonas.csv",
-    "frota_veiculos_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/frota_veiculos_sjc.csv",
-    "transito_zonas_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/transito_zonas_sjc.csv",
-    "pop_cresc_zonas_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/pop_cresc_zonas_sjc.csv",
-    "creches_zonas_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/creches_zonas_sjc.csv",
-    "escolaridade_por_nivel_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/escolaridade_por_nivel_sjc.csv",
-    "ideb_qualidade_zonas_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/ideb_qualidade_zonas_sjc.csv",
-    "infraestrutura_escolas_zonas": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/infraestrutura_escolas_zonas.csv",
-    "matriculas_por_periodo_zonas": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/matriculas_por_periodo_zonas.csv",
-    "alfabetizacao_geral_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/alfabetizacao_geral_sjc.csv",
-    "alfabetizacao_por_zonas_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/alfabetizacao_por_zonas_sjc.csv",
-    "servicos_geriatricos_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/servicos_geriatricos_sjc.csv",
-    "unidades_saude_idosos_zonas": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/unidades_saude_idosos_zonas.csv",
-    "projecao_envelhecimento_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/projecao_envelhecimento_sjc.csv",
-    "envelhecimento_por_zonas": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/envelhecimento_por_zonas.csv"
-}
-
-dataframes = {name: carregar_dados_csv(url) for name, url in urls_csv.items()}
-print("URLs definidas e dados carregados na memória principal.")
+print("\n--- [3/7] Configuração de dados delegada ao Streamlit... ---")
+# CORREÇÃO: Removemos o carregamento de dados aqui porque a função carregar_dados_csv
+# só existe dentro do script do Streamlit (Passo 4). O Flask não precisa carregar esses CSVs.
+print("Sucesso (Etapa pulada intencionalmente).")
 
 
 # ==============================================================================
