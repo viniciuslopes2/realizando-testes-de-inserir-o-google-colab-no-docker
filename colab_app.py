@@ -38,8 +38,6 @@ print("Pastas 'templates' e 'static/css' prontas.")
 # PASSO 3: (ETAPA REMOVIDA - Dados são carregados apenas no Streamlit)
 # ==============================================================================
 print("\n--- [3/7] Configuração de dados delegada ao Streamlit... ---")
-# CORREÇÃO: Removemos o carregamento de dados aqui porque a função carregar_dados_csv
-# só existe dentro do script do Streamlit (Passo 4). O Flask não precisa carregar esses CSVs.
 print("Sucesso (Etapa pulada intencionalmente).")
 
 
@@ -54,14 +52,14 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import re
-import unicodedata  # <--- ADICIONADO O IMPORT QUE FALTAVA AQUI
+import unicodedata
 
 st.set_page_config(page_title="Dashboard de Dados - SJC", page_icon="📊", layout="wide")
 
 @st.cache_data
 def carregar_dados_csv(url):
     try:
-        # Tenta ler com encoding utf-8, se falhar tenta latin1 (comum em excels brasileiros)
+        # Tenta ler com encoding utf-8, se falhar tenta latin1
         try:
             df = pd.read_csv(url, encoding='utf-8')
         except UnicodeDecodeError:
@@ -71,6 +69,7 @@ def carregar_dados_csv(url):
         rename_map = {}
         for col in original_columns:
             new_col = col.strip().lower()
+            # Normalização de nomes de colunas
             replacements = {' ': '_', 'ç': 'c', 'ã': 'a', 'õ': 'o', 'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u', 'â': 'a', 'ê': 'e', 'î': 'i', 'ô': 'o', 'û': 'u', '+': 'mais', '(': '', ')': ''}
             for old, new in replacements.items():
                 new_col = new_col.replace(old, new)
@@ -78,7 +77,7 @@ def carregar_dados_csv(url):
             rename_map[col] = new_col
         df = df.rename(columns=rename_map)
         
-        # Limpeza específica para coluna 'regiao' se existir
+        # Garante que a coluna de região seja string e limpa espaços
         if 'regiao' in df.columns:
             df['regiao'] = df['regiao'].astype(str).str.strip()
             
@@ -102,7 +101,7 @@ urls_csv = {
     "servicos_geriatricos_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/servicos_geriatricos_sjc.csv",
     "projecao_envelhecimento_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/projecao_envelhecimento_sjc.csv",
 
-    # Dados Específicos por Zona (Verificados nos seus arquivos)
+    # Dados Específicos por Zona
     "servicos_publicos_zonas": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/servicos_publicos_zonas.csv",
     "transito_zonas_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/transito_zonas_sjc.csv",
     "pop_cresc_zonas_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/pop_cresc_zonas_sjc.csv",
@@ -118,6 +117,16 @@ urls_csv = {
 dataframes = {name: carregar_dados_csv(url) for name, url in urls_csv.items()}
 
 # --- FUNÇÕES AUXILIARES ---
+def normalizar_texto(s):
+    if not isinstance(s, str): return str(s)
+    s = s.lower().strip()
+    s = unicodedata.normalize('NFD', s)
+    s = s.encode('ascii', 'ignore').decode('utf-8')
+    return s
+
+def formatar_faixa_display(faixa):
+    return faixa.replace('_', ' ').replace(' a ', '-').replace(' anos', '').replace(' ou mais', '+')
+
 def normalizar_faixa_etaria_2010(indicador):
     indicador = str(indicador).lower()
     if 'menos de 1' in indicador or '1 a 4' in indicador: return '0 a 4 anos'
@@ -143,18 +152,7 @@ def normalizar_faixa_etaria_2010(indicador):
     if '100 anos ou mais' in indicador: return '100 anos ou mais'
     return None
 
-def formatar_faixa_display(faixa):
-    return faixa.replace('_', ' ').replace(' a ', '-').replace(' anos', '').replace(' ou mais', '+')
-
-def normalizar_texto(s):
-    if not isinstance(s, str): return str(s)
-    s = s.lower()
-    # Remover acentos
-    s = unicodedata.normalize('NFD', s)
-    s = s.encode('ascii', 'ignore').decode('utf-8')
-    return s.strip()
-
-# --- FUNÇÕES DE GRÁFICOS GERAIS ---
+# --- FUNÇÕES DE GRÁFICOS GERAIS (Mantidas iguais) ---
 def gerar_grafico_sexo(df_idade_sexo_2022, df_faixa_h_2010, df_faixa_m_2010, df_pop_2022, df_pop_res_2010):
     st.header("Análise Populacional")
     if not df_pop_2022.empty and not df_pop_res_2010.empty:
@@ -454,28 +452,37 @@ def gerar_grafico_envelhecimento(df_projecao, df_zonas, df_unidades, df_servicos
 def gerar_dashboard_zona(zona, dfs):
     st.title(f"Perfil Detalhado: {zona}")
     
-    # Normaliza o nome da zona que veio da URL (ex: 'Zona Central' -> 'central')
-    zona_norm = normalizar_texto(zona).replace('zona ', '').strip()
-    st.write(f"Filtro aplicado: '{zona_norm}'")
+    # Limpeza inicial do nome vindo da URL
+    zona_clean = normalizar_texto(zona).replace('zona ', '').strip()
     
-    # Helper para filtrar DF pela coluna 'regiao'
+    # Mapeamento para garantir que 'central' vire 'centro', etc.
+    DE_PARA_ZONAS = {
+        'central': 'centro',
+        'centro': 'centro',
+        'sul': 'sul',
+        'norte': 'norte',
+        'leste': 'leste',
+        'oeste': 'oeste',
+        'sudeste': 'sudeste'
+    }
+    
+    # Pega o termo correto para busca no CSV
+    termo_busca = DE_PARA_ZONAS.get(zona_clean, zona_clean)
+    st.write(f"Visualizando dados para a região: **{termo_busca.capitalize()}**")
+    
+    # Helper para filtrar DF pela coluna 'regiao' de forma robusta
     def filtrar_zona(df, nome_df):
-        if df.empty: 
-            return pd.DataFrame()
+        if df.empty: return pd.DataFrame()
         
-        # Normaliza colunas para garantir que encontramos 'regiao' mesmo se houver variações
+        # Procura coluna de região
         col_regiao = next((c for c in df.columns if 'regiao' in c.lower()), None)
-        
-        if not col_regiao: 
-            return pd.DataFrame()
+        if not col_regiao: return pd.DataFrame()
 
-        # Cria coluna temporária normalizada
+        # Cria coluna temporária normalizada para comparação
         df['temp_search'] = df[col_regiao].astype(str).apply(normalizar_texto)
         
-        # Filtra onde a região normalizada CONTÉM o termo da zona
-        # Ex: 'sul' vai casar com 'sul'
-        # Ex: 'centro' vai casar com 'centro'
-        df_filt = df[df['temp_search'] == zona_norm].copy()
+        # Filtra onde a região normalizada é IGUAL ao termo de busca mapeado
+        df_filt = df[df['temp_search'] == termo_busca].copy()
         
         return df_filt.drop(columns=['temp_search'])
 
@@ -487,11 +494,9 @@ def gerar_dashboard_zona(zona, dfs):
         cols[0].metric("UBS", df_serv['ubs_unidades_basicas_saude'].values[0] if 'ubs_unidades_basicas_saude' in df_serv else '-')
         cols[1].metric("Hospitais", df_serv['hospitais'].values[0] if 'hospitais' in df_serv else '-')
         cols[2].metric("Escolas Municipais", df_serv['escolas_municipais'].values[0] if 'escolas_municipais' in df_serv else '-')
-        
-        # Mostra dataframe transposto para melhor leitura
         st.dataframe(df_serv.set_index('regiao').T, use_container_width=True)
     else:
-        st.info(f"Dados de serviços não encontrados para {zona} (termo buscado: {zona_norm})")
+        st.info(f"Dados de serviços não encontrados para {zona}")
 
     # 2. Trânsito
     st.header("2. Trânsito e Mobilidade")
