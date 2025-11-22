@@ -60,7 +60,12 @@ st.set_page_config(page_title="Dashboard de Dados - SJC", page_icon="📊", layo
 @st.cache_data
 def carregar_dados_csv(url):
     try:
-        df = pd.read_csv(url)
+        # Tenta ler com encoding utf-8, se falhar tenta latin1 (comum em excels brasileiros)
+        try:
+            df = pd.read_csv(url, encoding='utf-8')
+        except UnicodeDecodeError:
+            df = pd.read_csv(url, encoding='latin1')
+            
         original_columns = df.columns.tolist()
         rename_map = {}
         for col in original_columns:
@@ -71,8 +76,11 @@ def carregar_dados_csv(url):
             new_col = re.sub(r'[^a-z0-9_]', '', new_col)
             rename_map[col] = new_col
         df = df.rename(columns=rename_map)
-        if 'populacao_residencia_2022' in url and 'densidade' in df.columns:
-            df['densidade'] = df['densidade'].astype(str).str.replace(',', '.', regex=False).astype(float)
+        
+        # Limpeza específica para coluna 'regiao' se existir
+        if 'regiao' in df.columns:
+            df['regiao'] = df['regiao'].astype(str).str.strip()
+            
         return df
     except Exception as e:
         st.error(f"Erro ao carregar dados de {url}: {e}")
@@ -80,26 +88,29 @@ def carregar_dados_csv(url):
 
 # URLs do jsDelivr
 urls_csv = {
+    # Dados Gerais
     "idade_sexo_2022": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/RubyFox%20-%20Dados%20de%202022%20-%20Idade%20e%20sexo.csv",
     "populacao_residencia_2022": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/RubyFox%20-%20Dados%20de%202022%20-%20popula%C3%A7%C3%A3o%20e%20residencia.csv",
     "densidade_demografica_sjc_2010": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/densidade_demografica_sjc_2010.csv",
     "faixa_etaria_homens_2010": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/faixa_etaria_homens_2010.csv",
     "faixa_etaria_mulheres_2010": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/faixa_etaria_mulheres_2010.csv",
     "populacao_residente_sjc_2010": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/populacao_residente_sjc_2010.csv",
-    "servicos_publicos_zonas": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/servicos_publicos_zonas.csv",
     "frota_veiculos_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/frota_veiculos_sjc.csv",
+    "escolaridade_por_nivel_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/escolaridade_por_nivel_sjc.csv",
+    "alfabetizacao_geral_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/alfabetizacao_geral_sjc.csv",
+    "servicos_geriatricos_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/servicos_geriatricos_sjc.csv",
+    "projecao_envelhecimento_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/projecao_envelhecimento_sjc.csv",
+
+    # Dados Específicos por Zona (Verificados nos seus arquivos)
+    "servicos_publicos_zonas": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/servicos_publicos_zonas.csv",
     "transito_zonas_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/transito_zonas_sjc.csv",
     "pop_cresc_zonas_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/pop_cresc_zonas_sjc.csv",
     "creches_zonas_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/creches_zonas_sjc.csv",
-    "escolaridade_por_nivel_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/escolaridade_por_nivel_sjc.csv",
     "ideb_qualidade_zonas_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/ideb_qualidade_zonas_sjc.csv",
     "infraestrutura_escolas_zonas": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/infraestrutura_escolas_zonas.csv",
     "matriculas_por_periodo_zonas": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/matriculas_por_periodo_zonas.csv",
-    "alfabetizacao_geral_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/alfabetizacao_geral_sjc.csv",
     "alfabetizacao_por_zonas_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/alfabetizacao_por_zonas_sjc.csv",
-    "servicos_geriatricos_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/servicos_geriatricos_sjc.csv",
     "unidades_saude_idosos_zonas": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/unidades_saude_idosos_zonas.csv",
-    "projecao_envelhecimento_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/projecao_envelhecimento_sjc.csv",
     "envelhecimento_por_zonas": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/envelhecimento_por_zonas.csv"
 }
 
@@ -137,12 +148,9 @@ def formatar_faixa_display(faixa):
 def normalizar_texto(s):
     if not isinstance(s, str): return str(s)
     s = s.lower()
-    s = re.sub(r'[áàâãä]', 'a', s)
-    s = re.sub(r'[éèêë]', 'e', s)
-    s = re.sub(r'[íìîï]', 'i', s)
-    s = re.sub(r'[óòôõö]', 'o', s)
-    s = re.sub(r'[úùûü]', 'u', s)
-    s = re.sub(r'[ç]', 'c', s)
+    # Remover acentos
+    s = unicodedata.normalize('NFD', s)
+    s = s.encode('ascii', 'ignore').decode('utf-8')
     return s.strip()
 
 # --- FUNÇÕES DE GRÁFICOS GERAIS ---
@@ -445,68 +453,65 @@ def gerar_grafico_envelhecimento(df_projecao, df_zonas, df_unidades, df_servicos
 def gerar_dashboard_zona(zona, dfs):
     st.title(f"Perfil Detalhado: {zona}")
     
-    # Normalizar o nome da zona para filtrar os dataframes (remover acentos, lowercase)
-    zona_norm = normalizar_texto(zona)
+    # Normaliza o nome da zona que veio da URL (ex: 'Zona Central' -> 'central')
+    zona_norm = normalizar_texto(zona).replace('zona ', '').strip()
+    st.write(f"Filtro aplicado: '{zona_norm}'")
     
     # Helper para filtrar DF pela coluna 'regiao'
-    def filtrar_zona(df):
-        if df.empty: return pd.DataFrame()
+    def filtrar_zona(df, nome_df):
+        if df.empty: 
+            return pd.DataFrame()
         
         # Normaliza colunas para garantir que encontramos 'regiao' mesmo se houver variações
-        # (O carregamento já faz isso, mas seguro morreu de velho)
         col_regiao = next((c for c in df.columns if 'regiao' in c.lower()), None)
-        if not col_regiao: return pd.DataFrame()
+        
+        if not col_regiao: 
+            return pd.DataFrame()
 
+        # Cria coluna temporária normalizada
         df['temp_search'] = df[col_regiao].astype(str).apply(normalizar_texto)
         
-        # Lista de termos para tentar casar
-        termos = [zona_norm] # Ex: 'zona central'
-        
-        # Variações comuns
-        parts = zona_norm.split()
-        if 'zona' in parts: parts.remove('zona')
-        core_name = " ".join(parts) # Ex: 'central', 'norte'
-        
-        termos.append(core_name)
-        
-        # Sinônimos específicos SJC
-        if 'central' in core_name: termos.append('centro')
-        if 'centro' in core_name: termos.append('central')
-        
-        # Filtragem: Verifica se ALGUM termo está contido na coluna
-        # Usamos regex com pipe | para OR (ex: "zona central|central|centro")
-        pattern = '|'.join([re.escape(t) for t in termos if t])
-        
-        df_filt = df[df['temp_search'].str.contains(pattern, regex=True, na=False)]
+        # Filtra onde a região normalizada CONTÉM o termo da zona
+        # Ex: 'sul' vai casar com 'sul'
+        # Ex: 'centro' vai casar com 'centro'
+        df_filt = df[df['temp_search'] == zona_norm].copy()
         
         return df_filt.drop(columns=['temp_search'])
 
     # 1. Serviços Públicos
     st.header("1. Serviços Públicos")
-    df_serv = filtrar_zona(dfs['servicos_publicos_zonas'])
+    df_serv = filtrar_zona(dfs['servicos_publicos_zonas'], 'servicos_publicos_zonas')
     if not df_serv.empty:
         cols = st.columns(3)
         cols[0].metric("UBS", df_serv['ubs_unidades_basicas_saude'].values[0] if 'ubs_unidades_basicas_saude' in df_serv else '-')
         cols[1].metric("Hospitais", df_serv['hospitais'].values[0] if 'hospitais' in df_serv else '-')
         cols[2].metric("Escolas Municipais", df_serv['escolas_municipais'].values[0] if 'escolas_municipais' in df_serv else '-')
-        st.dataframe(df_serv, hide_index=True)
+        
+        # Mostra dataframe transposto para melhor leitura
+        st.dataframe(df_serv.set_index('regiao').T, use_container_width=True)
     else:
-        st.info(f"Dados de serviços não encontrados para {zona}")
+        st.info(f"Dados de serviços não encontrados para {zona} (termo buscado: {zona_norm})")
 
     # 2. Trânsito
     st.header("2. Trânsito e Mobilidade")
-    df_trans = filtrar_zona(dfs['transito_zonas_sjc'])
+    df_trans = filtrar_zona(dfs['transito_zonas_sjc'], 'transito_zonas_sjc')
     if not df_trans.empty:
-        st.write(f"**Nível de Congestionamento:** {df_trans['nivel_congestionamento'].values[0]}")
+        c1, c2 = st.columns(2)
+        c1.metric("Nível de Congestionamento", df_trans['nivel_congestionamento'].values[0])
         st.write(f"**Características:** {df_trans['caracteristicas_transito'].values[0]}")
+        st.write(f"**Problemas Principais:** {df_trans['problemas_principais'].values[0]}")
     else:
         st.info("Dados de trânsito não encontrados.")
 
     # 3. População
     st.header("3. Crescimento Populacional")
-    df_pop = filtrar_zona(dfs['pop_cresc_zonas_sjc'])
+    df_pop = filtrar_zona(dfs['pop_cresc_zonas_sjc'], 'pop_cresc_zonas_sjc')
     if not df_pop.empty:
-        st.metric("Crescimento Percentual (2010-2022)", f"{df_pop['crescimento_percentual'].values[0]}%")
+        col1, col2 = st.columns(2)
+        col1.metric("Crescimento Absoluto (2010-2022)", f"+{df_pop['crescimento_absoluto'].values[0]}")
+        col2.metric("Crescimento Percentual", f"{df_pop['crescimento_percentual'].values[0]}%")
+    else:
+        st.info("Dados de crescimento populacional não encontrados.")
     
     # 4. Educação
     st.header("4. Educação")
@@ -514,23 +519,36 @@ def gerar_dashboard_zona(zona, dfs):
     
     with col_edu1:
         st.subheader("Creches")
-        df_creche = filtrar_zona(dfs['creches_zonas_sjc'])
+        df_creche = filtrar_zona(dfs['creches_zonas_sjc'], 'creches_zonas_sjc')
         if not df_creche.empty:
-            st.write(f"**Demanda Atual:** {df_creche['demanda_atual'].values[0]}")
-            st.write(f"**Necessidade:** {df_creche['necessidade_expansao'].values[0]}")
+            st.metric("Unidades", df_creche['unidades_educacao_infantil'].values[0])
+            st.write(f"**Situação:** {df_creche['demanda_atual'].values[0]}")
+            st.write(f"**Necessidade de Expansão:** {df_creche['necessidade_expansao'].values[0]}")
+        else:
+            st.info("Dados de creches não encontrados.")
     
     with col_edu2:
-        st.subheader("IDEB")
-        df_ideb = filtrar_zona(dfs['ideb_qualidade_zonas_sjc'])
+        st.subheader("Qualidade (IDEB)")
+        df_ideb = filtrar_zona(dfs['ideb_qualidade_zonas_sjc'], 'ideb_qualidade_zonas_sjc')
         if not df_ideb.empty:
-            st.metric("IDEB Anos Iniciais", df_ideb['ideb_anos_iniciais_estimado'].values[0])
-            st.metric("IDEB Anos Finais", df_ideb['ideb_anos_finais_estimado'].values[0])
+            c1, c2 = st.columns(2)
+            c1.metric("Anos Iniciais", df_ideb['ideb_anos_iniciais_estimado'].values[0])
+            c2.metric("Anos Finais", df_ideb['ideb_anos_finais_estimado'].values[0])
+            st.write(f"**Infraestrutura:** {df_ideb['qualidade_infraestrutura'].values[0]}")
+        else:
+            st.info("Dados do IDEB não encontrados.")
 
     # 5. Saúde do Idoso
     st.header("5. Saúde do Idoso")
-    df_idoso = filtrar_zona(dfs['unidades_saude_idosos_zonas'])
+    df_idoso = filtrar_zona(dfs['unidades_saude_idosos_zonas'], 'unidades_saude_idosos_zonas')
     if not df_idoso.empty:
-        st.metric("UBS com foco em Idosos", df_idoso['ubs_existentes'].values[0])
+        c1, c2, c3 = st.columns(3)
+        c1.metric("População 65+", df_idoso['idosos_65mais_estimativa'].values[0])
+        c2.metric("UBS Existentes", df_idoso['ubs_existentes'].values[0])
+        c3.metric("Casa do Idoso", df_idoso['casa_do_idoso'].values[0])
+        st.write(f"**Prioridade de Investimento:** {df_idoso['prioridade_investimento'].values[0]}")
+    else:
+        st.info("Dados de saúde do idoso não encontrados.")
 
 
 # --- LÓGICA PRINCIPAL: SWITCH ENTRE GRÁFICOS GERAIS E ZONA ---
@@ -539,7 +557,6 @@ zona_param = params.get("zona", None) # Verifica se veio da URL do mapa
 
 if zona_param:
     # Se tem zona na URL, mostra o dashboard específico
-    # zona_param pode vir como lista ou string dependendo da versão do streamlit, garante string
     if isinstance(zona_param, list): zona_param = zona_param[0]
     gerar_dashboard_zona(zona_param, dataframes)
 else:
