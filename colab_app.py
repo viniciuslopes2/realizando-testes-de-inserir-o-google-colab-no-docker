@@ -3,7 +3,6 @@
 # ==============================================================================
 print("--- [1/7] Bibliotecas serão instaladas via Docker (requirements.txt) ---")
 import os
-# O Docker cuidará das instalações via requirements.txt
 print("Sucesso!")
 
 
@@ -100,8 +99,6 @@ urls_csv = {
     "alfabetizacao_geral_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/alfabetizacao_geral_sjc.csv",
     "servicos_geriatricos_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/servicos_geriatricos_sjc.csv",
     "projecao_envelhecimento_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/projecao_envelhecimento_sjc.csv",
-
-    # Dados Específicos por Zona
     "servicos_publicos_zonas": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/servicos_publicos_zonas.csv",
     "transito_zonas_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/transito_zonas_sjc.csv",
     "pop_cresc_zonas_sjc": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/Arquivos%20dados%20CSV/pop_cresc_zonas_sjc.csv",
@@ -116,7 +113,6 @@ urls_csv = {
 
 dataframes = {name: carregar_dados_csv(url) for name, url in urls_csv.items()}
 
-# --- FUNÇÕES AUXILIARES ---
 def normalizar_texto(s):
     if not isinstance(s, str): return str(s)
     s = s.lower().strip()
@@ -152,7 +148,6 @@ def normalizar_faixa_etaria_2010(indicador):
     if '100 anos ou mais' in indicador: return '100 anos ou mais'
     return None
 
-# --- FUNÇÕES DE GRÁFICOS GERAIS (Mantidas iguais) ---
 def gerar_grafico_sexo(df_idade_sexo_2022, df_faixa_h_2010, df_faixa_m_2010, df_pop_2022, df_pop_res_2010):
     st.header("Análise Populacional")
     if not df_pop_2022.empty and not df_pop_res_2010.empty:
@@ -447,15 +442,9 @@ def gerar_grafico_envelhecimento(df_projecao, df_zonas, df_unidades, df_servicos
     st.subheader("Serviços Geriátricos e de Apoio ao Idoso")
     if not df_servicos.empty:
         st.dataframe(df_servicos.rename(columns={'tipo_servico':'Tipo de Serviço', 'quantidade':'Quantidade', 'regiao_localizacao': 'Região/Localização', 'capacidade_atendimento': 'Capacidade', 'cobertura_estimada_idosos': 'Cobertura Estimada'}), use_container_width=True, hide_index=True)
-
-# --- NOVA FUNÇÃO: DASHBOARD ESPECÍFICO POR ZONA ---
 def gerar_dashboard_zona(zona, dfs):
     st.title(f"Perfil Detalhado: {zona}")
-    
-    # Limpeza inicial do nome vindo da URL
     zona_clean = normalizar_texto(zona).replace('zona ', '').strip()
-    
-    # Mapeamento para garantir que 'central' vire 'centro', etc.
     DE_PARA_ZONAS = {
         'central': 'centro',
         'centro': 'centro',
@@ -598,8 +587,6 @@ print(f"Arquivo '{STREAMLIT_APP_FILE}' criado com sucesso.")
 # PASSO 5: Cria os arquivos do site para o Flask
 # ==============================================================================
 print("\n--- [5/7] Criando os arquivos HTML e CSS para o portal Flask... ---")
-
-# URLs das imagens convertidas para jsDelivr
 graficos_info = {
     1: {"titulo": "População por Sexo", "imagem": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/.misc/img_template/img_html/img_sex.jpg"},
     2: {"titulo": "Densidade Demográfica", "imagem": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/.misc/img_template/img_html/img_dens_demo.jpg"},
@@ -610,8 +597,6 @@ graficos_info = {
     7: {"titulo": "Alfabetização", "imagem": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/.misc/img_template/img_html/img_alfa.jpg"},
     8: {"titulo": "Envelhecimento", "imagem": "https://cdn.jsdelivr.net/gh/FATCK06/ProjectAPI_FirstSemester@main/.misc/img_template/img_html/img_enve.jpg"}
 }
-
-# URLs do layout convertidas para jsDelivr
 layout_html = """
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -772,8 +757,6 @@ grafico_html = """
 """
 with open("templates/grafico.html", "w", encoding="utf-8") as f:
     f.write(grafico_html)
-
-# URL do banner convertida para jsDelivr
 css_content = """
 * { padding: 0; margin: 0; border: none; box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -826,10 +809,7 @@ print("Arquivos do portal Flask criados com sucesso.")
 print("\n--- [5.5/7] Gerando o mapa interativo (Folium)... ---")
 
 try:
-    # ---------- Extraindo GeoJson via URL RAW ----------
     url_geojson = 'https://raw.githubusercontent.com/FATCK06/ProjectAPI_FirstSemester/main/Delimita%C3%A7%C3%A3o%20da%20Zona%20de%20SJC/zonas_sjc_poligono.geojson'
-
-    # Seus dados (população e área aproximada — usados para população/densidade)
     zonas = {
         "Zona Norte": {'populacao': 100000, 'area': 23.35},
         "Zona Sul": {'populacao': 90000, 'area': 32.69},
@@ -847,71 +827,42 @@ try:
         "Zona Centro": "#ff7f00",
         "Zona Sudeste": "#ffff33"
     }
-
-    # ---------- Carregar GeoJSON ----------
     gdf = gpd.read_file(url_geojson)
 
     if gdf.crs is None:
         gdf.set_crs(epsg=4326, inplace=True)
-
-    # Reprojetar para UTM (métrico) para cálculo preciso de áreas/centroides
     gdf_proj = gdf.to_crs(epsg=32723)
-
-    # Calcula área em km² a partir da geometria reprojetada
     gdf['area_km2'] = gdf_proj.geometry.area / 1e6
-
-    # Calcula centroides em coordenadas WGS84 (lat/lon) para posicionar marcadores
-    centroids_proj = gdf_proj.centroid  # em UTM
+    centroids_proj = gdf_proj.centroid
     centroids_wgs = centroids_proj.to_crs(epsg=4326)
     gdf['centroid_lat'] = centroids_wgs.y
     gdf['centroid_lon'] = centroids_wgs.x
-
-    # Preparar mapeamento de nomes com normalização para fuzzy match
     def norm(s):
         if s is None:
             return ""
         s = str(s)
-        # remove acentos com unicodedata, converte para ascii
         s = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('ascii')
         s = s.lower()
         s = re.sub(r'[^a-z0-9]+', ' ', s).strip()
         return s
 
     zonas_norm_map = { norm(k): k for k in zonas.keys() }
-
-    # ---------- Criar mapa ----------
     map_center = [gdf['centroid_lat'].mean(), gdf['centroid_lon'].mean()]
     mapa = folium.Map(location=map_center, zoom_start=12, control_scale=True)
-
-    # Guardar funções JS para alternar polígonos
     js_functions = []
-
-    # Iterar features e criar markers/popups + JS toggle
     for idx, row in gdf.iterrows():
-        nome_raw = row.get('nome', '')  # nome vindo do GeoJSON
+        nome_raw = row.get('nome', '')
         nome_norm = norm(nome_raw)
-
-        # fuzzy match para encontrar a chave mais próxima em zonas, se existir
         possible = difflib.get_close_matches(nome_norm, list(zonas_norm_map.keys()), n=1, cutoff=0.6)
         matched_key = zonas_norm_map[possible[0]] if possible else None
-
         populacao = zonas[matched_key]['populacao'] if matched_key else None
-        # área a exibir: calculada a partir da geometria (mais precisa)
         area_calc = float(row['area_km2'])
         densidade = (populacao / area_calc) if (populacao and area_calc>0) else None
         cor = cores.get(matched_key if matched_key else nome_raw, "#3388ff")
-
-        # centroid for marker
         lat_c = float(row['centroid_lat'])
         lon_c = float(row['centroid_lon'])
-
-        # safe JS id
         safe = re.sub(r'\W+', '_', nome_raw if nome_raw else f'zona_{idx}')
-
-        # converter geometria para GeoJSON literal (objeto JS)
         geom_json = json.dumps(mapping(row.geometry))
-
-        # JS function (toggle) — usa L.geoJSON com o objeto GeoJSON
         js_fn = f"""
     function togglePoly_{safe}(){{
       var map = {mapa.get_name()};
@@ -929,14 +880,9 @@ try:
     }}
     """
         js_functions.append(js_fn)
-
-        # montar popup com valores formatados e fallback '---'
         pop_str = f"{int(populacao):,}".replace(',', '.') if populacao else "---"
         area_str = f"{area_calc:.2f}"
         dens_str = f"{densidade:.2f} hab/km²" if densidade else "---"
-
-        # Link para página de detalhes da zona
-        # Usamos urllib.parse.quote para garantir que espaços e acentos na URL funcionem
         safe_nome_url = urllib.parse.quote(nome_raw)
         
         popup_html = f"""
@@ -958,18 +904,13 @@ try:
             popup=folium.Popup(popup_html, max_width=330),
             icon=folium.Icon(color="red", icon="info-sign")
         ).add_to(mapa)
-
-    # injeta o JS no HTML do mapa
     script_all = "<script>\n" + "\n".join(js_functions) + "\n</script>"
     mapa.get_root().html.add_child(Element(script_all))
-
-    # ATUALIZADO: Salvar o mapa em um arquivo HTML que o Flask possa servir
     mapa.save("templates/mapa.html")
     print("Mapa interativo 'templates/mapa.html' salvo com sucesso.")
 
 except Exception as e:
     print(f"ERRO ao gerar o mapa: {e}")
-    # Criar um arquivo de fallback para não quebrar o Flask
     with open("templates/mapa.html", "w", encoding="utf-8") as f:
         f.write("<html><body><h1>Erro ao gerar o mapa</h1><p>{e}</p></body></html>")
 
@@ -982,15 +923,12 @@ print("\n--- [6/7] Configurando e iniciando os servidores... ---")
 def is_port_in_use(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(("localhost", port)) == 0
-
-# REMOVIDO: Bloco de autenticação do NGROK_AUTH_TOKEN
 FLASK_PORT = 5000
 STREAMLIT_PORT = 8501
-streamlit_public_url = None # Esta variável será usada, mas não será definida pelo ngrok
+streamlit_public_url = None
 
 print(f"Iniciando o Streamlit em background na porta {STREAMLIT_PORT}...")
 proc = subprocess.Popen(
-    # ATUALIZADO: Adicionado "--server.address", "0.0.0.0" para expor o Streamlit
     ["streamlit", "run", STREAMLIT_APP_FILE, "--server.port", str(STREAMLIT_PORT), "--server.headless", "true", "--server.address", "0.0.0.0"],
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
@@ -1012,19 +950,11 @@ print("Servidor Streamlit iniciado.")
 # ==============================================================================
 # PASSO 7: Configura o Flask e inicia o Ngrok
 # ==============================================================================
-# ATUALIZADO: Título da Etapa
 print("\n--- [7/7] Configurando e iniciando o servidor Flask ---")
-
-# NOVO: Lendo o IP Público do AWS a partir de uma variável de ambiente
-# Isso é crucial para o Docker saber qual IP usar nos links do iframe
-# Você definirá 'AWS_PUBLIC_IP' ao rodar o container no AWS
 AWS_PUBLIC_IP = os.environ.get('AWS_PUBLIC_IP', 'localhost')
 if AWS_PUBLIC_IP == 'localhost':
     print("AVISO: Variável de ambiente 'AWS_PUBLIC_IP' não definida. Usando 'localhost' como fallback.")
     print("Para produção no AWS, defina esta variável ao rodar o Docker.")
-
-# Define a URL pública do Streamlit baseada na variável de ambiente
-# A rota 'pagina_grafico' usará esta variável global
 streamlit_public_url = f"http://{AWS_PUBLIC_IP}:{STREAMLIT_PORT}"
 print(f"URL do Streamlit (para iframes) definida como: {streamlit_public_url}")
 
@@ -1042,41 +972,26 @@ def pagina_grafico(grafico_id):
     if not grafico:
         return "Gráfico não encontrado", 404
     return render_template('grafico.html', title=grafico["titulo"], streamlit_public_url=streamlit_public_url, grafico_id=grafico_id)
-
-# ADICIONADO: Nova rota para servir o mapa interativo gerado
 @app.route("/mapa")
 def pagina_mapa():
     """Serve a página do mapa interativo."""
     return render_template('mapa.html')
-
-# NOVA ROTA: Página de detalhes da zona selecionada no mapa
 @app.route("/zona_detalhes")
 def pagina_zona_detalhes():
     global streamlit_public_url
-    # Pega o nome da zona da URL (ex: ?zona=Zona%20Centro)
     zona = request.args.get('zona')
     if not zona:
         return "Zona não especificada", 400
-    
-    # Reutiliza o template grafico.html, mas passando o parametro 'zona'
     return render_template('grafico.html', 
                            title=f"Dados da {zona}", 
                            streamlit_public_url=streamlit_public_url, 
-                           grafico_id=None, # Não estamos usando ID aqui
-                           zona=zona) # Passamos a zona para o template
-
-# ATUALIZADO: Bloco try/except removido do ngrok e app.run modificado para deploy
+                           grafico_id=None,
+                           zona=zona)
 try:
-    # NOTA: Para deploy real no AWS, você vai querer definir a URL
-    # para o IP público do seu servidor.
-    # Ex: streamlit_public_url = "http://SEU_IP_PUBLICO:8501"
-    
     print("\n" + "=" * 60)
     print(f"Servidor Flask iniciando em http://0.0.0.0:{FLASK_PORT}")
     print("Acesse este aplicativo pelo IP público do seu servidor.")
     print("=" * 60)
-    
-    # Rodando o app para ser acessível externamente (host='0.0.0.0')
     app.run(host='0.0.0.0', port=FLASK_PORT)
 
 except Exception as e:
